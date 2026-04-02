@@ -21,6 +21,7 @@ export default function UploadTab({ onParse }: UploadTabProps) {
       name: file.name,
       size: file.size,
       type: file.type,
+      file: file,
     }));
 
     dispatch(addFiles(mappedFiles));

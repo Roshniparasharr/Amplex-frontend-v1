@@ -7,6 +7,7 @@ export interface QuoteFile {
   name: string;
   size: number;
   type: string;
+  file: File;
 }
 
 export interface ParsedLineItem {

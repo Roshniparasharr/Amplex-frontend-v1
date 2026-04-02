@@ -7,6 +7,7 @@ import UploadTab from "../components/quote/UploadTab";
 import PasteEmailTab from "../components/quote/PasteEmailTab";
 import ManualEntryTab from "../components/quote/ManualEntryTab";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
+import { uploadRfqFile, validateStandards } from "../app/services/quoteApi";
 import {
   resetQuote,
   setActiveTab,
@@ -25,128 +26,80 @@ export default function NewQuotePage() {
     (state) => state.quote
   );
 
-  const handleParse = () => {
+  const handleParse = async () => {
+    if (files.length === 0) return;
+
     dispatch(setParseStatus("processing"));
 
-    setTimeout(() => {
+    try {
+      const uploadResult = await uploadRfqFile(files[0].file);
+
       dispatch(
         setParsedProjectMeta({
-          customerName: "Consolidated Power Projects Australia Pty Ltd",
-          contactName: "Harry Armstrong",
-          company: "CPP",
-          projectName: "Elaine BESS Project",
-          deliveryAddress: "Unnamed Road, Elaine, 3334, VIC",
-          gpsCoordinates: "-37.732146, 144.009274",
-          warranty: "48 Months",
-          specialRequirements: [
-            "Non-Propagator of Fire",
-            "Low Smoke Emissions",
-            "Enhanced Resistance to heat and fire",
-          ],
+          customerName: uploadResult.spec?.customer?.name || "",
+          contactName: "",
+          company: "",
+          projectName: uploadResult.spec?.project_ref || "",
+          deliveryAddress: uploadResult.spec?.customer?.site_address || "",
+          gpsCoordinates: "",
+          warranty: "",
+          specialRequirements: uploadResult.spec?.special_requirements || [],
         })
       );
 
       dispatch(
-        setParsedLineItems([
-          {
-            id: "1",
-            item: 1,
-            description:
-              "Power Cable Cu(Cl2)/V-90/5V-90/CTS/5V-90 (White)/(Black) 0.6/1kV",
-            cores: "20C1.5",
-            qty: 400,
-            confidence: 98,
-          },
-          {
-            id: "2",
-            item: 2,
-            description:
-              "Power Cable Cu(Cl2)/V-90/5V-90/CTS/5V-90 (White)/(Black) 0.6/1kV",
-            cores: "12C2.5",
-            qty: 550,
-            confidence: 97,
-          },
-          {
-            id: "3",
-            item: 3,
-            description:
-              "Power Cable Cu(Cl2)/X-90/5V-90/CTS/5V-90 (Red,White,Blue,Black)/(OrangeUV) 0.6/1kV",
-            cores: "4C16",
-            qty: 2100,
-            confidence: 94,
-          },
-          {
-            id: "4",
-            item: 4,
-            description:
-              "Power Cable Cu(Cl2)/X-90/5V-90/CTS/5V-90 (Red/Black)/(Orange) 0.6/1kV",
-            cores: "2C10",
-            qty: 2200,
-            confidence: 93,
-          },
-        ])
+        setParsedLineItems(
+          (uploadResult.spec?.line_items || []).map((item: any, index: number) => ({
+            id: item.line_ref || `${index + 1}`,
+            item: index + 1,
+            description: item.raw_description || "",
+            cores:
+              item.cores && item.csa_mm2
+                ? `${item.cores}C${item.csa_mm2}`
+                : item.cores
+                ? String(item.cores)
+                : "",
+            qty: item.quantity_m || 0,
+            confidence: item.confidence ? Math.round(item.confidence * 100) : 0,
+          }))
+        )
+      );
+
+      const validateResult = await validateStandards(
+        uploadResult.quote_id,
+        uploadResult.spec
       );
 
       dispatch(
-        setEngineeringSuggestions([
-          {
-            id: "eng-1",
-            lineItemId: "1",
-            originalDescription:
-              "Power Cable Cu(Cl2)/V-90/5V-90/CTS/5V-90 (White)/(Black) 0.6/1kV",
-            suggestedDescription:
-              "Power Cable Cu(Cl2)/V-90/5V-90/CTS/5V-90 (White)/(Black) 0.6/1kV",
-            proposedConfiguration: "20C1.5mm² Cu X-90 0.6/1kV CTS",
-            standard: "AS/NZS 5000.1",
-            clauseReference: "Clause 3.2 / 3.4",
-            gaps: [],
-            approved: false,
-          },
-          {
-            id: "eng-2",
-            lineItemId: "2",
-            originalDescription:
-              "Power Cable Cu(Cl2)/V-90/5V-90/CTS/5V-90 (White)/(Black) 0.6/1kV",
-            suggestedDescription:
-              "Power Cable Cu(Cl2)/V-90/5V-90/CTS/5V-90 (White)/(Black) 0.6/1kV",
-            proposedConfiguration: "12C2.5mm² Cu X-90 0.6/1kV CTS",
-            standard: "AS/NZS 5000.1",
-            clauseReference: "Clause 3.2 / 3.4",
-            gaps: [],
-            approved: false,
-          },
-          {
-            id: "eng-3",
-            lineItemId: "3",
-            originalDescription:
-              "Power Cable Cu(Cl2)/X-90/5V-90/CTS/5V-90 (Red,White,Blue,Black)/(OrangeUV) 0.6/1kV",
-            suggestedDescription:
-              "Power Cable Cu(Cl2)/X-90/5V-90/CTS/5V-90 (Red,White,Blue,Black)/(OrangeUV) 0.6/1kV",
-            proposedConfiguration: "4C16mm² Cu X-90 0.6/1kV CTS Orange UV",
-            standard: "AS/NZS 5000.1",
-            clauseReference: "Clause 3.5",
-            gaps: ["Confirm UV sheath colour coding"],
-            approved: false,
-          },
-          {
-            id: "eng-4",
-            lineItemId: "4",
-            originalDescription:
-              "Power Cable Cu(Cl2)/X-90/5V-90/CTS/5V-90 (Red/Black)/(Orange) 0.6/1kV",
-            suggestedDescription:
-              "Power Cable Cu(Cl2)/X-90/5V-90/CTS/5V-90 (Red/Black)/(Orange) 0.6/1kV",
-            proposedConfiguration: "2C10mm² Cu X-90 0.6/1kV CTS Orange",
-            standard: "AS/NZS 5000.1",
-            clauseReference: "Clause 3.5",
-            gaps: [],
-            approved: false,
-          },
-        ])
+        setEngineeringSuggestions(
+          (validateResult.validation?.line_items || []).map(
+            (item: any, index: number) => ({
+              id: `eng-${index + 1}`,
+              lineItemId: item.line_ref || "",
+              originalDescription:
+                uploadResult.spec?.line_items?.find(
+                  (line: any) => line.line_ref === item.line_ref
+                )?.raw_description || "",
+              suggestedDescription: item.standardised_description || "",
+              proposedConfiguration: item.standardised_description || "",
+              standard: "AS/NZS 5000.1",
+              clauseReference:
+                item.warnings && item.warnings.length > 0
+                  ? "Review warnings"
+                  : "Standard validation passed",
+              gaps: [...(item.issues || []), ...(item.warnings || [])],
+              approved: false,
+            })
+          )
+        )
       );
 
       dispatch(setParseStatus("success"));
       navigate("/quotes/engineering-review");
-    }, 1200);
+    } catch (error) {
+      console.error("API Error:", error);
+      dispatch(setParseStatus("error"));
+    }
   };
 
   return (
